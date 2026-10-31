@@ -15,11 +15,13 @@ export function readAiCleanConfig() {
     fileConfig = {};
   }
   const python = process.env.AI_CLEAN_PYTHON || fileConfig.python || '';
+  const pythonIsPath = Boolean(python) && (path.isAbsolute(python) || python.includes('/') || python.includes('\\'));
+  const pythonExists = pythonIsPath ? fs.existsSync(python) : Boolean(python);
   return {
     python,
     maxSize: Number(fileConfig.maxSize || process.env.AI_CLEAN_MAX_SIZE || 2000),
     timeoutMs: Number(fileConfig.timeoutMs || 300000),
-    configured: Boolean(python) && fs.existsSync(scriptFile) && fs.existsSync(python),
+    configured: pythonExists && fs.existsSync(scriptFile),
   };
 }
 
