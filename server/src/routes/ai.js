@@ -3,6 +3,7 @@ import {
   analyzeVocab, detectHandwriting, extractMistakes, generateSentences, publicAiInfo, regenerateMistake,
   regenerateSentence, regenerateVocab, resolveAiConfig, testConnection,
 } from '../ai-service.js';
+import { aiCleanStatus, inpaintWithLama } from '../ai-clean.js';
 import {
   createMistake, createSentence, createVocab, getMistakeRow, getSentenceRow,
   getVocabRow, mapMistake, mapSentence, mapVocab, updateMistakeFields,
@@ -13,6 +14,14 @@ import { HttpError, asyncRoute, cleanText, truncate } from '../utils.js';
 export const aiRouter = express.Router();
 
 aiRouter.get('/info', (req, res) => res.json(publicAiInfo()));
+
+aiRouter.get('/clean-status', (req, res) => res.json(aiCleanStatus()));
+
+aiRouter.post('/inpaint', asyncRoute(async (req, res) => {
+  const { imageData, maskData } = req.body || {};
+  const result = await inpaintWithLama({ imageData, maskData });
+  res.json(result);
+}));
 
 function thinkFlag(value) {
   return value === true || value === 'true' || value === 1;

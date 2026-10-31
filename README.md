@@ -51,7 +51,7 @@
 
 - 多张题目图片一起上传，AI 自动判断「多图一题」还是「一图多题」。
 - 上传前逐张裁剪：可拖拽框选、调整、跳过；支持手机照片压缩。
-- **去除手写笔迹**：每张题目原图都可以打开「去笔迹」工具。蓝/红/绿色笔迹可本地一键清除，不需要 API；铅笔字、整段批注可用「框选修补」：拖一个框，程序会从附近干净纸张取样并匹配光照，补出自然纹理；黑色笔迹也可手动涂抹或让 AI 框选。支持撤销/重做、对比原图，上传前与已收录错题的编辑页都可以使用。
+- **去除手写笔迹**：每张题目原图都可以打开「去笔迹」工具。蓝/红/绿色笔迹可本地一键清除，不需要 API；铅笔字、整段批注可用「框选修补」：拖一个框，程序会从附近干净纸张取样并匹配光照，补出自然纹理；复杂纸纹可用「AI 蒙版」涂红后交给本机 LaMa 修补（需安装可选 AI 服务）。支持撤销/重做、对比原图，上传前与已收录错题的编辑页都可以使用。
 - AI 提取题干、答案、解析、知识点、难度，公式使用 Markdown + LaTeX。
 - AI 会根据题目判断是否需要画图，返回可直接绘制的函数表达式；审阅页与详情页会生成「AI 参考函数图像」，帮助你观察最值、交点与单调性。
 - AI 标记题目中的函数图 / 几何图位置，审阅时一键裁剪成配图；也可从原图手动框选。
@@ -251,6 +251,24 @@ docker compose --profile tunnel up -d
 ### 提示词
 
 内置提示词在 `server/src/prompts.js`，针对高中错题、佳句、词汇做了结构化 JSON 约束。设置页可以给三类任务分别追加「额外要求」，无需改代码。
+
+---
+
+## 可选：本机 AI 修补（LaMa / IOPaint）
+
+普通去笔迹、框选修补和彩色笔迹清除都不需要 Python。只有「AI 蒙版 → AI 修补」需要本机启动一个 LaMa Python 进程：
+
+```powershell
+python -m venv D:\ai\lama-venv
+D:\ai\lama-venv\Scripts\python.exe -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+D:\ai\lama-venv\Scripts\python.exe -m pip install --no-cache-dir simple-lama-inpainting
+```
+
+然后把 `server/ai/config.example.json` 复制为 `server/data/ai/config.json`，填入你的 Python 路径。详细说明见 [server/ai/README.md](server/ai/README.md)。
+
+- 首次使用会下载 `big-lama` 模型（约 200MB）到 PyTorch 缓存。
+- CPU 处理一张 2000px 图片通常需要几十秒；不需要 GPU。
+- 未安装时应用其他功能不受影响，只会隐藏/禁用「AI 修补」按钮。
 
 ---
 

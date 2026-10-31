@@ -1,0 +1,5 @@
+{
+  "python": "python",
+  "maxSize": 2000,
+  "timeoutMs": 300000
+}

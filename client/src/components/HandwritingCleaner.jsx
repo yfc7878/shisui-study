@@ -320,7 +320,9 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   const navigate = useNavigate();
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
+  const aiMaskCanvasRef = useRef(null);
   const pointerRef = useRef(null);
+  const maskPointerRef = useRef(null);
   const selectRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [actions, setActions] = useState([]);
@@ -333,6 +335,9 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   const [paperColor, setPaperColor] = useState('#fffdf8');
   const [detecting, setDetecting] = useState(false);
   const [colorBusy, setColorBusy] = useState(false);
+  const [aiMaskDirty, setAiMaskDirty] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiClean, setAiClean] = useState(null);
   const [applying, setApplying] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [error, setError] = useState('');
@@ -347,8 +352,10 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
     setRegions([]);
     setSelection(null);
     setTool('brush');
+    setAiMaskDirty(false);
     setError('');
     setShowOriginal(false);
+    api.get('/api/ai/clean-status').then(setAiClean).catch(() => setAiClean({ available: false }));
     loadImage(src).then((image) => {
       if (!alive) return;
       imageRef.current = image;
@@ -408,6 +415,8 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
         inpaintCanvasMask(ctx, mask, paperColor);
       } else if (action.type === 'textureRect') {
         textureFillRect(ctx, action.rect, paperColor);
+      } else if (action.type === 'bitmap') {
+        ctx.drawImage(action.image, 0, 0, canvas.width, canvas.height);
       }
     }
   }, [actions, paperColor]);
@@ -416,6 +425,15 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
     if (!ready) return;
     redraw();
   }, [ready, redraw]);
+
+  useEffect(() => {
+    const maskCanvas = aiMaskCanvasRef.current;
+    if (!ready || !maskCanvas || !natural.width) return;
+    maskCanvas.width = natural.width;
+    maskCanvas.height = natural.height;
+    maskCanvas.getContext('2d').clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    setAiMaskDirty(false);
+  }, [ready, natural]);
 
   const pointFromEvent = (event) => {
     const canvas = canvasRef.current;
@@ -496,6 +514,90 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
     setSelection(null);
     setTool('brush');
     toast('已用周围干净纸张纹理修补选区；如果位置不对可以撤销', 'success');
+  };
+
+  const maskPointFromEvent = (event) => {
+    const canvas = aiMaskCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * (canvas.width / rect.width),
+      y: (event.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  };
+
+  const drawMaskSegment = (from, to) => {
+    const canvas = aiMaskCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = 'rgba(206, 66, 54, 0.55)';
+    ctx.fillStyle = 'rgba(206, 66, 54, 0.55)';
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (from && to) {
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    } else if (to) {
+      ctx.beginPath();
+      ctx.arc(to.x, to.y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    setAiMaskDirty(true);
+  };
+
+  const onAiMaskPointerDown = (event) => {
+    if (tool !== 'aiMask' || !ready || aiBusy) return;
+    const point = maskPointFromEvent(event);
+    maskPointerRef.current = point;
+    aiMaskCanvasRef.current.setPointerCapture?.(event.pointerId);
+    drawMaskSegment(null, point);
+  };
+
+  const onAiMaskPointerMove = (event) => {
+    if (!maskPointerRef.current || tool !== 'aiMask') return;
+    const point = maskPointFromEvent(event);
+    drawMaskSegment(maskPointerRef.current, point);
+    maskPointerRef.current = point;
+  };
+
+  const onAiMaskPointerUp = () => {
+    maskPointerRef.current = null;
+  };
+
+  const clearAiMask = () => {
+    const canvas = aiMaskCanvasRef.current;
+    if (!canvas) return;
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    setAiMaskDirty(false);
+    setTool('brush');
+  };
+
+  const applyAiRepair = async () => {
+    if (!aiMaskDirty) {
+      toast('请先点「AI 蒙版」，把要修掉的笔迹涂红', 'info');
+      return;
+    }
+    if (!aiClean?.available) {
+      toast(aiClean?.message || '本机 AI 修补未配置，请参考 server/ai/README.md', 'info');
+      return;
+    }
+    setAiBusy(true);
+    setError('');
+    try {
+      const imageData = canvasRef.current.toDataURL('image/jpeg', 0.9);
+      const maskData = aiMaskCanvasRef.current.toDataURL('image/png');
+      const result = await api.post('/api/ai/inpaint', { imageData, maskData }, { timeout: 310_000 });
+      const repaired = await loadImage(result.image);
+      setActions((current) => [...current, { type: 'bitmap', image: repaired }]);
+      setRedoStack([]);
+      clearAiMask();
+      toast(`AI 修补完成${result.ms ? `（${Math.round(result.ms / 1000)} 秒）` : ''}，可撤销`, 'success');
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setAiBusy(false);
+    }
   };
 
   const undo = () => {
@@ -647,6 +749,17 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
             >
               <Scan size={14} /> 框选修补
             </button>
+            <button
+              type="button"
+              className={cx('hw-select-toggle', tool === 'aiMask' && 'is-active')}
+              onClick={() => setTool(tool === 'aiMask' ? 'brush' : 'aiMask')}
+              title="涂红要修掉的笔迹，再交给本机 LaMa 修补"
+            >
+              <Wand2 size={14} /> AI 蒙版
+            </button>
+            {aiMaskDirty && (
+              <IconButton icon={Eraser} label="清除 AI 蒙版" size="sm" onClick={clearAiMask} />
+            )}
             <label className="hw-size-control" title="笔刷大小">
               <span>{brushSize}px</span>
               <input type="range" min="8" max="90" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} />
@@ -671,9 +784,21 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
         <div className="hw-ai-bar">
           <div>
             <strong><Sparkles size={15} /> 自动去笔迹</strong>
-            <p>蓝/红/绿笔迹可直接本地清除，不需要 API Key；黑色笔迹用 AI 框选或手动修补。</p>
+            <p>蓝/红/绿笔迹可直接本地清除；黑色、铅笔或照片纸纹用「AI 蒙版」涂红后交给本机 LaMa 修补（需安装服务）。</p>
           </div>
           <div className="hw-ai-actions">
+            {aiClean && !aiClean.available && <span className="hw-ai-unavailable">本机 AI 未配置</span>}
+            <Button
+              variant="primary"
+              size="sm"
+              icon={aiBusy ? Loader2 : Wand2}
+              onClick={applyAiRepair}
+              loading={aiBusy}
+              disabled={!aiMaskDirty || !aiClean?.available}
+              title={aiClean?.available ? '用本机 LaMa 修补红色蒙版区域' : '本机 AI 修补未配置'}
+            >
+              {aiBusy ? 'AI 修补中…' : 'AI 修补'}
+            </Button>
             <Button
               variant="soft"
               size="sm"
@@ -735,6 +860,15 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
               onPointerCancel={onPointerUp}
               aria-label="笔迹擦除画布"
             />
+            <canvas
+              ref={aiMaskCanvasRef}
+              className={cx('hw-ai-mask-canvas', tool === 'aiMask' && 'is-active')}
+              onPointerDown={onAiMaskPointerDown}
+              onPointerMove={onAiMaskPointerMove}
+              onPointerUp={onAiMaskPointerUp}
+              onPointerCancel={onAiMaskPointerUp}
+              aria-label="AI 修补蒙版画布"
+            />
             {showOriginal && <img className="hw-original-overlay" src={src} alt="原图" />}
             {!showOriginal && regionOverlays.map((region) => (
               <span className="hw-region-box" style={region.style} key={region.key} title={region.label} />
@@ -758,6 +892,7 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
           <span><Brush size={13} /> 手动擦除：按住鼠标/手指涂抹</span>
           <span><Scan size={13} /> 框选修补：适合成片铅笔字/批注</span>
           <span><PaintBucket size={13} /> 彩色笔迹：本地一键清除</span>
+          <span><Wand2 size={13} /> AI 蒙版 + AI 修补：适合复杂纸纹/铅笔</span>
           <span><Undo2 size={13} /> 每一步都可以撤销</span>
         </div>
       </div>
