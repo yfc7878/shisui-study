@@ -3,7 +3,7 @@ import path from 'node:path';
 import { config } from './config.js';
 import { getUpload, mapUpload } from './db.js';
 import {
-  PROMPT_VERSION, mistakeExtractionPrompt, mistakeRegeneratePrompt, sentencesPrompt,
+  PROMPT_VERSION, handwritingPrompt, mistakeExtractionPrompt, mistakeRegeneratePrompt, sentencesPrompt,
   sentenceRegeneratePrompt, vocabPrompt, vocabRegeneratePrompt,
 } from './prompts.js';
 import { HttpError, cleanText } from './utils.js';
@@ -353,6 +353,49 @@ export async function regenerateMistake({ ai, item, imageIds, think, extraInstru
       regenerated: true,
       functionGraphs: q.functionGraphs,
     },
+  };
+}
+
+export async function detectHandwriting({ ai, imageData, think = false }) {
+  if (typeof imageData !== 'string' || !/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(imageData)) {
+    throw new HttpError(400, '图片数据格式不正确', 'BAD_IMAGE_DATA');
+  }
+  if (imageData.length > 24 * 1024 * 1024) {
+    throw new HttpError(413, '图片太大，请先压缩后再识别笔迹', 'IMAGE_TOO_LARGE');
+  }
+  const result = await chatJson({
+    ai,
+    think: Boolean(think),
+    maxTokens: 5000,
+    messages: [
+      { role: 'system', content: handwritingPrompt() },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: '请识别这张题目图片中的手写笔迹区域并输出 JSON。' },
+          { type: 'image_url', image_url: { url: imageData, detail: 'original' } },
+        ],
+      },
+    ],
+  });
+  const raw = Array.isArray(result.data?.regions) ? result.data.regions : [];
+  const regions = [];
+  for (const item of raw) {
+    const bbox = bboxOf(item?.bbox || item?.box);
+    if (!bbox) continue;
+    regions.push({
+      bbox,
+      label: cleanText(item?.label, 40) || '手写笔迹',
+      confidence: Number.isFinite(Number(item?.confidence)) ? Number(item.confidence) : null,
+    });
+    if (regions.length >= 80) break;
+  }
+  return {
+    regions,
+    model: result.model,
+    usage: result.usage,
+    promptVersion: PROMPT_VERSION,
+    reasoning: result.reasoning,
   };
 }
 

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, ChevronUp, ChevronDown, Crop, FileText, ImagePlus,
-  Loader2, Plus, ScanLine, Settings2, Sparkles, Trash2, Upload, Wand2, X,
+  CheckCircle2, ChevronUp, ChevronDown, Crop, Eraser, FileText, ImagePlus,
+  Loader2, Plus, ScanLine, Settings2, Sparkles, Trash2, Wand2,
 } from 'lucide-react';
 import { api, errorMessage, uploadImages } from '../lib/api.js';
 import { compressImageFile, loadImage } from '../lib/image.js';
@@ -14,6 +14,7 @@ import {
   Toggle, cx,
 } from '../components/ui.jsx';
 import ImageCropper from '../components/ImageCropper.jsx';
+import HandwritingCleaner from '../components/HandwritingCleaner.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 
 const STEPS = [
@@ -36,6 +37,7 @@ export default function NewMistakePage() {
   const [extracting, setExtracting] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [cropEntry, setCropEntry] = useState(null);
+  const [cleanEntry, setCleanEntry] = useState(null);
   const [subjectHint, setSubjectHint] = useState('');
   const [think, setThink] = useState(Boolean(loadSettings().ai.thinkDefault));
   const [advanced, setAdvanced] = useState(false);
@@ -225,7 +227,7 @@ export default function NewMistakePage() {
                 <div className="upload-list-head">
                   <div>
                     <strong>{entries.length} 张图片</strong>
-                    <span>可逐张裁剪、排序或取消使用</span>
+                    <span>可逐张裁剪、去除笔迹、排序或取消使用</span>
                   </div>
                   <Button variant="ghost" size="sm" icon={Plus} onClick={() => inputRef.current?.click()}>添加更多</Button>
                 </div>
@@ -242,6 +244,9 @@ export default function NewMistakePage() {
                         <span>{entry.width} × {entry.height}</span>
                       </div>
                       <div className="upload-item-actions">
+                        <button type="button" className="upload-clean" onClick={() => setCleanEntry(entry)} title="去除手写笔迹" aria-label="去除手写笔迹">
+                          <Eraser size={14} />
+                        </button>
                         <Checkbox
                           checked={entry.use}
                           onChange={(checked) => setEntries((list) => list.map((item) => (item.key === entry.key ? { ...item, use: checked } : item)))}
@@ -338,7 +343,7 @@ export default function NewMistakePage() {
             <ul>
               <li>尽量正对拍摄，题干完整、字迹清晰。</li>
               <li>同一题的多页可以都上传，AI 会合并。</li>
-              <li>试卷边缘的无关内容可以先用裁剪去掉。</li>
+              <li>试卷边缘的无关内容可以先用裁剪去掉；有手写答案时点「去笔迹」。</li>
               <li>含函数图、几何图时，审阅页可以再单独裁剪配图。</li>
             </ul>
           </Card>
@@ -358,6 +363,19 @@ export default function NewMistakePage() {
           const image = await loadImage(url);
           replaceEntry(cropEntry.key, file, url, image.naturalWidth, image.naturalHeight);
           toast('裁剪已应用', 'success');
+        }}
+      />
+
+      <HandwritingCleaner
+        open={Boolean(cleanEntry)}
+        src={cleanEntry?.url}
+        onClose={() => setCleanEntry(null)}
+        onApply={async (blob) => {
+          const file = new File([blob], `cleaned-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          const url = URL.createObjectURL(blob);
+          const image = await loadImage(url);
+          replaceEntry(cleanEntry.key, file, url, image.naturalWidth, image.naturalHeight);
+          toast('笔迹已去除，图片已更新', 'success');
         }}
       />
 

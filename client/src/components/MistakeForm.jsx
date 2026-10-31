@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { ImageIcon, Lightbulb, Tag } from 'lucide-react';
+import { Eraser, ImageIcon, Lightbulb, Tag } from 'lucide-react';
+import { uploadBlob } from '../lib/api.js';
 import {
   DIFFICULTY_LABELS, ERROR_REASONS, SOURCES, SUBJECTS,
 } from '../lib/constants.js';
 import {
   Badge, Card, Field, Lightbox, Markdown, Select, TagInput, Textarea, cx,
 } from './ui.jsx';
+import { useToast } from '../contexts/ToastContext.jsx';
 import MarkdownField from './MarkdownField.jsx';
 import FigureEditor from './FigureEditor.jsx';
+import HandwritingCleaner from './HandwritingCleaner.jsx';
 
 export default function MistakeForm({ value, onChange, readOnly = false }) {
+  const { toast } = useToast();
   const [lightbox, setLightbox] = useState(null);
+  const [cleanTarget, setCleanTarget] = useState(null);
   const set = (patch) => onChange?.({ ...value, ...patch });
 
   return (
@@ -130,15 +135,26 @@ export default function MistakeForm({ value, onChange, readOnly = false }) {
 
         <div className="image-strip">
           {(value.images || []).map((image, index) => (
-            <button
-              type="button"
-              key={image.id || index}
-              className="image-strip-item"
-              onClick={() => setLightbox({ src: image.url, alt: `原图 ${index + 1}` })}
-            >
-              <img src={image.url} alt={`题目原图 ${index + 1}`} loading="lazy" />
-              <span>原图 {index + 1}</span>
-            </button>
+            <div className="image-strip-wrap" key={image.id || index}>
+              <button
+                type="button"
+                className="image-strip-item"
+                onClick={() => setLightbox({ src: image.url, alt: `原图 ${index + 1}` })}
+              >
+                <img src={image.url} alt={`题目原图 ${index + 1}`} loading="lazy" />
+                <span>原图 {index + 1}</span>
+              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="image-clean-btn"
+                  onClick={() => setCleanTarget({ src: image.url, index })}
+                  title="去除这张图片上的手写笔迹"
+                >
+                  <Eraser size={12} /> 去笔迹
+                </button>
+              )}
+            </div>
           ))}
           {(value.images || []).length === 0 && (
             <div className="image-strip-empty"><ImageIcon size={15} /> 没有上传原图</div>
@@ -192,6 +208,24 @@ export default function MistakeForm({ value, onChange, readOnly = false }) {
       </Card>
 
       <Lightbox open={Boolean(lightbox)} src={lightbox?.src} alt={lightbox?.alt} onClose={() => setLightbox(null)} />
+
+      <HandwritingCleaner
+        open={Boolean(cleanTarget)}
+        src={cleanTarget?.src}
+        title="去除题目图片笔迹"
+        onClose={() => setCleanTarget(null)}
+        onApply={async (blob) => {
+          const uploaded = await uploadBlob(blob, `cleaned-question-${Date.now()}.jpg`);
+          if (!uploaded) throw new Error('清理后的图片上传失败');
+          const nextImages = (value.images || []).map((image, index) => (
+            index === cleanTarget.index
+              ? { ...uploaded, name: image.name || '', cleanedFrom: image.id }
+              : image
+          ));
+          set({ images: nextImages });
+          toast('笔迹已去除；保存后这张图片会被替换', 'success');
+        }}
+      />
     </div>
   );
 }

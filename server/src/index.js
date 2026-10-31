@@ -49,7 +49,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2mb' }));
+// 笔迹识别会把压缩后的图片以 base64 放在 JSON 中，因此放宽到 24MB。
+app.use(express.json({ limit: '24mb' }));
 app.use(sameOriginGuard);
 
 app.get('/api/health', (req, res) => {

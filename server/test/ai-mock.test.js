@@ -19,6 +19,14 @@ let appLog = '';
 const captured = [];
 
 function aiResponseFor(system) {
+  if (system.includes('图像清理助手')) {
+    return {
+      regions: [
+        { bbox: [0.10, 0.20, 0.16, 0.06], label: '手写答案', confidence: 0.93 },
+        { bbox: [0.50, 0.60, 0.12, 0.05], label: '批注', confidence: 0.81 },
+      ],
+    };
+  }
   if (system.includes('错题集')) {
     return {
       paper_source: '模拟月考试卷',
@@ -104,7 +112,7 @@ async function json(pathname, options = {}) {
 }
 
 async function waitFor(url) {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     try {
       const response = await fetch(url);
@@ -255,5 +263,25 @@ describe('AI 调用链路（本地 mock）', () => {
     assert.equal(data.item.data.coreTranslation, '维持');
     assert.equal(data.item.data.examples.length, 1);
     assert.equal(data.item.status, 'pending');
+  });
+
+  it('笔迹区域识别：返回归一化矩形', async () => {
+    const imageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lz8c9wAAAABJRU5ErkJggg==';
+    const { response, data } = await json('/api/ai/detect-handwriting', {
+      method: 'POST',
+      body: {
+        imageData,
+        think: false,
+        ai: { apiKey: 'test-key', baseUrl: `http://127.0.0.1:${MOCK_PORT}`, model: 'deepseek-flash' },
+      },
+    });
+    assert.equal(response.status, 200, JSON.stringify(data));
+    assert.equal(data.regions.length, 2);
+    assert.deepEqual(data.regions[0].bbox, [0.1, 0.2, 0.16, 0.06]);
+    assert.equal(data.regions[0].label, '手写答案');
+    assert.equal(data.meta.model, 'deepseek-flash');
+    const call = captured.at(-1);
+    const userContent = call.messages[1].content;
+    assert.ok(userContent.some((block) => block.type === 'image_url'));
   });
 });

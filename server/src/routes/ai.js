@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-  analyzeVocab, extractMistakes, generateSentences, publicAiInfo, regenerateMistake,
+  analyzeVocab, detectHandwriting, extractMistakes, generateSentences, publicAiInfo, regenerateMistake,
   regenerateSentence, regenerateVocab, resolveAiConfig, testConnection,
 } from '../ai-service.js';
 import {
@@ -21,6 +21,24 @@ function thinkFlag(value) {
 aiRouter.post('/test', asyncRoute(async (req, res) => {
   const result = await testConnection(req.body?.ai || {});
   res.json(result);
+}));
+
+aiRouter.post('/detect-handwriting', asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  const ai = resolveAiConfig(body.ai || {});
+  const result = await detectHandwriting({
+    ai,
+    imageData: body.imageData,
+    think: thinkFlag(body.think),
+  });
+  res.json({
+    regions: result.regions,
+    meta: {
+      model: result.model,
+      usage: result.usage,
+      promptVersion: result.promptVersion,
+    },
+  });
 }));
 
 aiRouter.post('/extract-mistake', asyncRoute(async (req, res) => {
