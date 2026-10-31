@@ -67,6 +67,7 @@
   box-shadow: 0 7px 16px -8px color-mix(in srgb, var(--primary) 65%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 .btn-primary:hover:not(:disabled) {
+  color: var(--on-primary);
   background: linear-gradient(180deg, color-mix(in srgb, var(--primary-hover) 96%, #fff 4%), var(--primary-hover));
   box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--primary) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
@@ -76,18 +77,19 @@
   border-color: var(--line);
   box-shadow: var(--shadow-xs);
 }
-.btn-secondary:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-2); }
+.btn-secondary:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); background: var(--surface-2); }
 .btn-ghost { color: var(--ink-soft); background: transparent; }
 .btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
 .btn-soft { color: var(--primary); background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 10%, transparent); }
-.btn-soft:hover:not(:disabled) { background: color-mix(in srgb, var(--primary-soft) 78%, var(--primary) 6%); }
+.btn-soft:hover:not(:disabled) { color: var(--primary); background: color-mix(in srgb, var(--primary-soft) 78%, var(--primary) 6%); }
 .btn-danger { color: #fff8f5; background: var(--danger); border-color: color-mix(in srgb, var(--danger) 80%, #000 8%); }
-.btn-danger:hover:not(:disabled) { filter: brightness(1.05); }
+.btn-danger:hover:not(:disabled) { color: #fff8f5; filter: brightness(1.05); }
 .btn-danger-ghost { color: var(--danger); background: transparent; }
 .btn-danger-ghost:hover:not(:disabled) { background: var(--danger-soft); }
 .btn-accent { color: #fff9f4; background: var(--accent); border-color: color-mix(in srgb, var(--accent) 80%, #000 8%); }
-.btn-accent:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-accent:hover:not(:disabled) { color: #fff9f4; background: var(--accent-hover); }
 .btn-link { height: auto; padding: 0; color: var(--primary); background: transparent; border: 0; font-weight: 600; }
+.btn-link:hover:not(:disabled) { color: var(--primary-hover); }
 .btn-sm { height: 34px; padding: 0 12px; font-size: 12.5px; border-radius: 9px; gap: 5px; }
 .btn-lg { height: 50px; padding: 0 23px; font-size: 14.5px; border-radius: 14px; }
 .btn-block { width: 100%; }

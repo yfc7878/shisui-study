@@ -8,7 +8,9 @@ export function handwritingPrompt() {
 - 印刷字体本身的笔画
 - 空白纸张、阴影、污点（除非明显是笔迹）
 
-若手写与印刷内容重叠，只框住手写笔迹本身，尽量紧贴笔画，不要为了省事框住整段印刷文字。坐标归一化到图片左上角，取值 0-1。
+若手写与印刷内容重叠，只框住手写笔迹本身，尽量紧贴笔画，不要为了省事框住整段印刷文字。请拆成多个小矩形，不要把所有手写合并成一个很大的框；每个框尽量只覆盖一小段笔画或一个批注。
+
+坐标归一化到图片左上角，取值 0-1。
 
 只输出一个严格合法的 JSON 对象，不要 Markdown 代码围栏：
 {
@@ -16,7 +18,7 @@ export function handwritingPrompt() {
     { "bbox": [0.12, 0.30, 0.18, 0.06], "label": "手写答案", "confidence": 0.92 }
   ]
 }
-最多 80 个区域；没有手写笔迹时输出空数组。`;
+最多 120 个区域；没有手写笔迹时输出空数组。`;
 }
 
 export function mistakeExtractionPrompt({ subjectHint = '', imageCount = 1, extraInstructions = '' } = {}) {

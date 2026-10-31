@@ -100,6 +100,9 @@
 .hw-size-control input { width: 100px; accent-color: var(--primary); }
 .hw-color-control { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); }
 .hw-color-control input { width: 26px; height: 26px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
+.hw-mode-control select { height: 27px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink-soft); font-size: 10.5px; padding: 0 5px; outline: none; }
+.hw-mode-control select:focus { border-color: var(--accent); }
+.hw-ai-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .hw-ai-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--violet) 17%, var(--line)); border-radius: 11px; background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--violet-soft) 45%, var(--surface))); flex-wrap: wrap; }
 .hw-ai-bar strong { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .hw-ai-bar strong svg { color: var(--violet); }
@@ -984,6 +987,8 @@
   .hw-toolbar { align-items: flex-start; }
   .hw-tools { width: 100%; justify-content: flex-end; }
   .hw-size-control input { width: 76px; }
+  .hw-ai-actions { width: 100%; }
+  .hw-ai-actions .btn { flex: 1; }
   .hw-canvas-wrap { padding: 7px; }
   .hw-canvas-box { width: min(100%, calc(44vh * var(--hw-ratio))); }
   .hw-tip { gap: 8px; }

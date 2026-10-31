@@ -1,13 +1,186 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Brush, Check, Eraser, Eye, EyeOff, Loader2, Redo2, RotateCcw, Sparkles, Undo2, Wand2,
+  Brush, Check, Eraser, Eye, EyeOff, Loader2, PaintBucket, Redo2, RotateCcw, Sparkles, Undo2, Wand2,
 } from 'lucide-react';
 import { api, errorMessage } from '../lib/api.js';
 import { loadImage } from '../lib/image.js';
 import { getAiConfig, hasApiKey } from '../lib/settings.js';
 import { Button, IconButton, Modal, cx } from './ui.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
+
+function hexToRgb(hex) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!match) return { r: 255, g: 253, b: 248 };
+  const value = Number.parseInt(match[1], 16);
+  return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+}
+
+function saturationOf(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+function expandMask(mask, width, height, radius = 1) {
+  const expanded = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (!mask[index]) continue;
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= height) continue;
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= width) continue;
+          expanded[yy * width + xx] = 1;
+        }
+      }
+    }
+  }
+  return expanded;
+}
+
+// 蓝/红/绿等彩色笔迹：不仅看饱和度，也看颜色通道偏向，
+// 这样连笔迹边缘很淡的抗锯齿像素也能一起修补掉，避免留下残影。
+function buildColorMask(data, width, height, threshold = 0.28) {
+  const mask = new Uint8Array(width * height);
+  let count = 0;
+  for (let index = 0; index < width * height; index += 1) {
+    const offset = index * 4;
+    const r = data[offset]; const g = data[offset + 1]; const b = data[offset + 2];
+    const max = Math.max(r, g, b);
+    // 最暗的印刷字/黑色笔迹不参与彩色判断。
+    if (max < 55) continue;
+    // 既看饱和度，也看很淡的蓝/红/绿通道偏向；绿色条件更严格，避免误删深绿色印刷字。
+    const colorful = saturationOf(r, g, b) > threshold
+      || (b - r > 5 && b - g > 3)
+      || (r - g > 8 && r - b > 6)
+      || (g - r > 16 && g - b > 10);
+    if (colorful) {
+      mask[index] = 1;
+      count += 1;
+    }
+  }
+  return { mask: count ? expandMask(mask, width, height, 10) : mask, count };
+}
+
+function buildStrokeMask(points, size, width, height) {
+  const mask = new Uint8Array(width * height);
+  const radius = Math.max(2, size / 2);
+  const stamp = (cx, cy) => {
+    const left = Math.max(0, Math.floor(cx - radius));
+    const right = Math.min(width - 1, Math.ceil(cx + radius));
+    const top = Math.max(0, Math.floor(cy - radius));
+    const bottom = Math.min(height - 1, Math.ceil(cy + radius));
+    const radiusSq = radius * radius;
+    for (let y = top; y <= bottom; y += 1) {
+      for (let x = left; x <= right; x += 1) {
+        const dx = x - cx; const dy = y - cy;
+        if (dx * dx + dy * dy <= radiusSq) mask[y * width + x] = 1;
+      }
+    }
+  };
+  for (let i = 0; i < points.length; i += 1) {
+    const point = points[i];
+    stamp(point.x, point.y);
+    if (i > 0) {
+      const previous = points[i - 1];
+      const distance = Math.hypot(point.x - previous.x, point.y - previous.y);
+      const steps = Math.max(1, Math.ceil(distance / Math.max(2, radius / 2)));
+      for (let step = 1; step < steps; step += 1) {
+        const ratio = step / steps;
+        stamp(previous.x + (point.x - previous.x) * ratio, previous.y + (point.y - previous.y) * ratio);
+      }
+    }
+  }
+  return mask;
+}
+
+// AI 标记框：只擦掉框内明显深于纸张或带颜色的笔迹像素，而不是整块矩形。
+function buildRegionMask(data, width, height, rects, paperColor) {
+  const paper = hexToRgb(paperColor);
+  const paperLum = paper.r * 0.299 + paper.g * 0.587 + paper.b * 0.114;
+  const mask = new Uint8Array(width * height);
+  let count = 0;
+  for (const rect of rects) {
+    const left = Math.max(0, Math.floor(rect.x));
+    const top = Math.max(0, Math.floor(rect.y));
+    const right = Math.min(width, Math.ceil(rect.x + rect.width));
+    const bottom = Math.min(height, Math.ceil(rect.y + rect.height));
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        const index = y * width + x;
+        const offset = index * 4;
+        const r = data[offset]; const g = data[offset + 1]; const b = data[offset + 2];
+        const lum = r * 0.299 + g * 0.587 + b * 0.114;
+        if (lum < paperLum - 28 || saturationOf(r, g, b) > 0.24) {
+          mask[index] = 1;
+          count += 1;
+        }
+      }
+    }
+  }
+  return { mask: count ? expandMask(mask, width, height, 1) : mask, count };
+}
+
+// 从边界向内扩散颜色，把笔迹下面的纸张补回来；比直接涂一块纯色自然。
+function inpaintCanvasMask(ctx, mask, paperColor) {
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const total = width * height;
+  const state = new Uint8Array(total);
+  const pending = [];
+  for (let index = 0; index < total; index += 1) {
+    if (mask[index]) pending.push(index);
+    else state[index] = 1;
+  }
+  if (!pending.length) return 0;
+  let remaining = pending.length;
+  for (let pass = 0; pass < 90 && remaining > 0; pass += 1) {
+    const updates = [];
+    for (const index of pending) {
+      if (state[index]) continue;
+      const x = index % width;
+      const y = Math.floor(index / width);
+      let r = 0; let g = 0; let b = 0; let n = 0;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= height) continue;
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const xx = x + dx;
+          if (xx < 0 || xx >= width) continue;
+          const neighbor = yy * width + xx;
+          if (!state[neighbor]) continue;
+          const offset = neighbor * 4;
+          r += data[offset]; g += data[offset + 1]; b += data[offset + 2]; n += 1;
+        }
+      }
+      if (n) updates.push([index, r / n, g / n, b / n]);
+    }
+    if (!updates.length) break;
+    for (const [index, r, g, b] of updates) {
+      const offset = index * 4;
+      data[offset] = r; data[offset + 1] = g; data[offset + 2] = b; data[offset + 3] = 255;
+      state[index] = 1;
+      remaining -= 1;
+    }
+  }
+  if (remaining > 0) {
+    const fallback = hexToRgb(paperColor);
+    for (const index of pending) {
+      if (state[index]) continue;
+      const offset = index * 4;
+      data[offset] = fallback.r; data[offset + 1] = fallback.g; data[offset + 2] = fallback.b; data[offset + 3] = 255;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return pending.length;
+}
 
 function samplePaperColor(image) {
   try {
@@ -61,8 +234,10 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   const [redoStack, setRedoStack] = useState([]);
   const [regions, setRegions] = useState([]);
   const [brushSize, setBrushSize] = useState(28);
+  const [brushMode, setBrushMode] = useState('heal');
   const [paperColor, setPaperColor] = useState('#fffdf8');
   const [detecting, setDetecting] = useState(false);
+  const [colorBusy, setColorBusy] = useState(false);
   const [applying, setApplying] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const [error, setError] = useState('');
@@ -119,9 +294,24 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
         for (const rect of action.rects) {
           ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
         }
+      } else if (action.type === 'healStroke') {
+        const mask = buildStrokeMask(action.points, action.size, canvas.width, canvas.height);
+        inpaintCanvasMask(ctx, mask, paperColor);
+      } else if (action.type === 'autoColor') {
+        // 两遍：第一遍去掉主笔画，第二遍补掉残留的淡色抗锯齿边缘。
+        for (let pass = 0; pass < 2; pass += 1) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const { count, mask } = buildColorMask(imageData.data, canvas.width, canvas.height);
+          if (!count) break;
+          inpaintCanvasMask(ctx, mask, paperColor);
+        }
+      } else if (action.type === 'smartRegion') {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const { mask } = buildRegionMask(imageData.data, canvas.width, canvas.height, action.rects, paperColor);
+        inpaintCanvasMask(ctx, mask, paperColor);
       }
     }
-  }, [actions]);
+  }, [actions, paperColor]);
 
   useEffect(() => {
     if (!ready) return;
@@ -138,7 +328,7 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   };
 
   const onPointerDown = (event) => {
-    if (!ready || showOriginal || detecting) return;
+    if (!ready || showOriginal || detecting || colorBusy) return;
     const point = pointFromEvent(event);
     pointerRef.current = { points: [point], color: paperColor, size: brushSize };
     canvasRef.current.setPointerCapture?.(event.pointerId);
@@ -170,7 +360,10 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
     if (!pointerRef.current) return;
     const stroke = pointerRef.current;
     pointerRef.current = null;
-    setActions((current) => [...current, { type: 'brush', points: stroke.points, color: stroke.color, size: stroke.size }]);
+    const action = brushMode === 'heal'
+      ? { type: 'healStroke', points: stroke.points, size: stroke.size }
+      : { type: 'brush', points: stroke.points, color: stroke.color, size: stroke.size };
+    setActions((current) => [...current, action]);
     setRedoStack([]);
   };
 
@@ -226,6 +419,29 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
     }
   };
 
+  const removeColoredInk = async () => {
+    if (!ready || !canvasRef.current) return;
+    setColorBusy(true);
+    setError('');
+    try {
+      await new Promise((resolve) => { setTimeout(resolve, 30); });
+      const ctx = canvasRef.current.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+      const { count } = buildColorMask(imageData.data, canvasRef.current.width, canvasRef.current.height);
+      if (!count) {
+        toast('没有检测到明显的蓝/红/绿色笔迹；黑色笔迹请用 AI 识别或手动修补', 'info');
+        return;
+      }
+      setActions((current) => [...current, { type: 'autoColor' }]);
+      setRedoStack([]);
+      toast(`已找到并修补 ${count.toLocaleString()} 个彩色笔迹像素，可撤销`, 'success');
+    } catch (err) {
+      setError(err.message || '彩色笔迹处理失败');
+    } finally {
+      setColorBusy(false);
+    }
+  };
+
   const eraseRegions = () => {
     if (!regions.length || !natural.width) return;
     const rects = regions.map((region) => ({
@@ -234,10 +450,10 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
       width: region.bbox[2] * natural.width,
       height: region.bbox[3] * natural.height,
     }));
-    setActions((current) => [...current, { type: 'region', rects, color: paperColor }]);
+    setActions((current) => [...current, { type: 'smartRegion', rects }]);
     setRedoStack([]);
     setRegions([]);
-    toast('已去除标记区域；如果误删，可以撤销或继续手动修补', 'success');
+    toast('已智能修补标记区域；如果误删，可以撤销或继续手动修补', 'success');
   };
 
   const apply = async () => {
@@ -286,16 +502,22 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
         <div className="hw-toolbar">
           <div className="hw-tool-group">
             <span className="hw-tool-label"><Brush size={14} /> 手动擦除</span>
-            <span className="hw-brush-hint">在图片上涂抹，擦除颜色默认为纸张色</span>
+            <span className="hw-brush-hint">智能修补会从周围纸张取样填补，比整块涂白更自然</span>
           </div>
           <div className="hw-tools">
             <label className="hw-size-control" title="笔刷大小">
               <span>{brushSize}px</span>
               <input type="range" min="8" max="90" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} />
             </label>
-            <label className="hw-color-control" title="擦除颜色">
+            <label className="hw-color-control" title="修补/填充颜色">
               <input type="color" value={paperColor} onChange={(event) => setPaperColor(event.target.value)} />
               <span>纸张色</span>
+            </label>
+            <label className="hw-mode-control" title="手动笔刷模式">
+              <select value={brushMode} onChange={(event) => setBrushMode(event.target.value)}>
+                <option value="heal">智能修补</option>
+                <option value="solid">纸张色平涂</option>
+              </select>
             </label>
             <IconButton icon={Undo2} label="撤销" size="sm" onClick={undo} disabled={!actions.length} />
             <IconButton icon={Redo2} label="重做" size="sm" onClick={redo} disabled={!redoStack.length} />
@@ -306,25 +528,37 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
 
         <div className="hw-ai-bar">
           <div>
-            <strong><Sparkles size={15} /> AI 自动识别笔迹</strong>
-            <p>让 AI 框出学生手写答案、批注与划痕。不会直接删除，先显示红色区域，由你确认后去除。</p>
+            <strong><Sparkles size={15} /> 自动去笔迹</strong>
+            <p>蓝/红/绿笔迹可直接本地清除，不需要 API Key；黑色笔迹用 AI 框选或手动修补。</p>
           </div>
-          <Button
-            variant={hasApiKey() ? 'soft' : 'secondary'}
-            size="sm"
-            icon={detecting ? Loader2 : Wand2}
-            onClick={autoDetect}
-            loading={detecting}
-            disabled={!ready}
-          >
-            {detecting ? 'AI 正在找手写…' : '自动识别手写笔迹'}
-          </Button>
+          <div className="hw-ai-actions">
+            <Button
+              variant="soft"
+              size="sm"
+              icon={colorBusy ? Loader2 : PaintBucket}
+              onClick={removeColoredInk}
+              loading={colorBusy}
+              disabled={!ready}
+            >
+              {colorBusy ? '处理中…' : '去彩色笔迹'}
+            </Button>
+            <Button
+              variant={hasApiKey() ? 'soft' : 'secondary'}
+              size="sm"
+              icon={detecting ? Loader2 : Wand2}
+              onClick={autoDetect}
+              loading={detecting}
+              disabled={!ready}
+            >
+              {detecting ? 'AI 正在找手写…' : 'AI 识别笔迹'}
+            </Button>
+          </div>
         </div>
 
         {error && <div className="hw-error">{error}</div>}
         {regions.length > 0 && (
           <div className="hw-region-banner">
-            <span><Eraser size={15} /> AI 标记了 {regions.length} 处区域，红色框内将被填充为纸张色。</span>
+            <span><Eraser size={15} /> AI 标记了 {regions.length} 处区域，确认后会智能补纸，而不是整块涂白。</span>
             <div className="row">
               <Button variant="ghost" size="sm" onClick={() => setRegions([])}>忽略标记</Button>
               <Button variant="primary" size="sm" icon={Eraser} onClick={eraseRegions}>去除全部标记</Button>
@@ -359,8 +593,8 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
 
         <div className="hw-tip">
           <span><Brush size={13} /> 手动擦除：按住鼠标/手指涂抹</span>
-          <span><Undo2 size={13} /> 每一步都可以撤销</span>
-          <span><Eraser size={13} /> AI 区域只会填充颜色，不改变原文件</span>
+          <span><PaintBucket size={13} /> 彩色笔迹：本地一键清除</span>
+          <span><Undo2 size={13} /> 每一步都可以撤销，原文件不改变</span>
         </div>
       </div>
     </Modal>

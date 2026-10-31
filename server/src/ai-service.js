@@ -388,7 +388,7 @@ export async function detectHandwriting({ ai, imageData, think = false }) {
       label: cleanText(item?.label, 40) || '手写笔迹',
       confidence: Number.isFinite(Number(item?.confidence)) ? Number(item.confidence) : null,
     });
-    if (regions.length >= 80) break;
+    if (regions.length >= 120) break;
   }
   return {
     regions,
