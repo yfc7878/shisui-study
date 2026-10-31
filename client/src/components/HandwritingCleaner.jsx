@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Brush, Check, Eraser, Eye, EyeOff, Loader2, PaintBucket, Redo2, RotateCcw, Sparkles, Undo2, Wand2,
+  Brush, Check, Eraser, Eye, EyeOff, Loader2, PaintBucket, Redo2, RotateCcw, Scan, Sparkles, Undo2, Wand2,
 } from 'lucide-react';
 import { api, errorMessage } from '../lib/api.js';
 import { loadImage } from '../lib/image.js';
@@ -44,26 +44,25 @@ function expandMask(mask, width, height, radius = 1) {
 
 // 蓝/红/绿等彩色笔迹：不仅看饱和度，也看颜色通道偏向，
 // 这样连笔迹边缘很淡的抗锯齿像素也能一起修补掉，避免留下残影。
-function buildColorMask(data, width, height, threshold = 0.28) {
+function buildColorMask(data, width, height) {
   const mask = new Uint8Array(width * height);
   let count = 0;
   for (let index = 0; index < width * height; index += 1) {
     const offset = index * 4;
     const r = data[offset]; const g = data[offset + 1]; const b = data[offset + 2];
     const max = Math.max(r, g, b);
-    // 最暗的印刷字/黑色笔迹不参与彩色判断。
-    if (max < 55) continue;
-    // 既看饱和度，也看很淡的蓝/红/绿通道偏向；绿色条件更严格，避免误删深绿色印刷字。
-    const colorful = saturationOf(r, g, b) > threshold
-      || (b - r > 5 && b - g > 3)
-      || (r - g > 8 && r - b > 6)
-      || (g - r > 16 && g - b > 10);
-    if (colorful) {
+    // 只认“红/蓝/绿明显压过另外两个通道”的彩色笔迹。
+    // 不再使用通用饱和度：照片里的深色印刷字常有轻微色偏，容易被误删。
+    if (max < 65) continue;
+    const red = r - g > 8 && r - b > 7;
+    const blue = b - r > 8 && b - g > 5;
+    const green = g - r > 16 && g - b > 10;
+    if (red || blue || green) {
       mask[index] = 1;
       count += 1;
     }
   }
-  return { mask: count ? expandMask(mask, width, height, 10) : mask, count };
+  return { mask: count ? expandMask(mask, width, height, 4) : mask, count };
 }
 
 function buildStrokeMask(points, size, width, height) {
@@ -182,6 +181,99 @@ function inpaintCanvasMask(ctx, mask, paperColor) {
   return pending.length;
 }
 
+function findCleanPaperPatch(data, width, height, rect, paperColor) {
+  const patch = 96;
+  const paper = hexToRgb(paperColor);
+  const paperLum = paper.r * 0.299 + paper.g * 0.587 + paper.b * 0.114;
+  const target = {
+    left: Math.max(0, Math.floor(rect.x)),
+    top: Math.max(0, Math.floor(rect.y)),
+    right: Math.min(width, Math.ceil(rect.x + rect.width)),
+    bottom: Math.min(height, Math.ceil(rect.y + rect.height)),
+  };
+  let best = null;
+  for (let y = 0; y <= height - patch; y += 36) {
+    for (let x = 0; x <= width - patch; x += 36) {
+      // 不能从选区附近取样，否则会把笔迹又复制回来。
+      if (x + patch > target.left - 8 && x < target.right + 8
+        && y + patch > target.top - 8 && y < target.bottom + 8) continue;
+      let ink = 0; let lumSum = 0; let lumSq = 0; let samples = 0;
+      for (let yy = y; yy < y + patch; yy += 4) {
+        for (let xx = x; xx < x + patch; xx += 4) {
+          const offset = (yy * width + xx) * 4;
+          const r = data[offset]; const g = data[offset + 1]; const b = data[offset + 2];
+          const lum = r * 0.299 + g * 0.587 + b * 0.114;
+          lumSum += lum; lumSq += lum * lum; samples += 1;
+          if (lum < paperLum - 34 || saturationOf(r, g, b) > 0.3) ink += 1;
+        }
+      }
+      const inkFrac = ink / samples;
+      const meanLum = lumSum / samples;
+      const std = Math.sqrt(Math.max(0, lumSq / samples - meanLum * meanLum));
+      const centerX = x + patch / 2;
+      const centerY = y + patch / 2;
+      const targetX = (target.left + target.right) / 2;
+      const targetY = (target.top + target.bottom) / 2;
+      const distance = Math.hypot(centerX - targetX, centerY - targetY);
+      // 纸张纹理的亮度标准差很小；带铅笔字/印刷字的纹理标准差明显更大。
+      const score = inkFrac * 240 + std * 2.2 + Math.abs(meanLum - paperLum) * 0.08 + distance / 1800;
+      if (!best || score < best.score) best = { x, y, score, inkFrac, std };
+    }
+  }
+  return best && best.inkFrac < 0.015 ? best : null;
+}
+
+// 用附近干净纸张纹理补选区：比纯色/扩散更自然，适合擦掉铅笔字、批注。
+function textureFillRect(ctx, rect, paperColor) {
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  const left = Math.max(0, Math.floor(rect.x));
+  const top = Math.max(0, Math.floor(rect.y));
+  const right = Math.min(width, Math.ceil(rect.x + rect.width));
+  const bottom = Math.min(height, Math.ceil(rect.y + rect.height));
+  const w = right - left; const h = bottom - top;
+  if (w < 4 || h < 4) return false;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const donor = findCleanPaperPatch(data, width, height, { x: left, y: top, width: w, height: h }, paperColor);
+  if (!donor) {
+    const mask = new Uint8Array(width * height);
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) mask[y * width + x] = 1;
+    }
+    inpaintCanvasMask(ctx, mask, paperColor);
+    return true;
+  }
+  const patch = 96;
+  const donorCanvas = document.createElement('canvas');
+  donorCanvas.width = width; donorCanvas.height = height;
+  const donorCtx = donorCanvas.getContext('2d');
+  donorCtx.filter = 'blur(22px)';
+  donorCtx.drawImage(ctx.canvas, 0, 0);
+  const blur = donorCtx.getImageData(0, 0, width, height).data;
+  const feather = Math.min(18, Math.floor(Math.min(w, h) / 3));
+  const output = new Uint8ClampedArray(data);
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      const sx = donor.x + ((x - left) % patch);
+      const sy = donor.y + ((y - top) % patch);
+      const dst = (y * width + x) * 4;
+      const src = (sy * width + sx) * 4;
+      const bdst = dst; const bsrc = src;
+      const edgeX = Math.min(x - left, right - 1 - x);
+      const edgeY = Math.min(y - top, bottom - 1 - y);
+      const alpha = feather > 0 ? Math.min(1, Math.min(edgeX, edgeY) / feather) : 1;
+      for (let c = 0; c < 3; c += 1) {
+        const value = data[src + c] + (blur[bdst + c] - blur[bsrc + c]);
+        output[dst + c] = value * alpha + data[dst + c] * (1 - alpha);
+      }
+      output[dst + 3] = 255;
+    }
+  }
+  ctx.putImageData(new ImageData(output, width, height), 0, 0);
+  return true;
+}
+
 function samplePaperColor(image) {
   try {
     const canvas = document.createElement('canvas');
@@ -229,12 +321,15 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   const imageRef = useRef(null);
   const canvasRef = useRef(null);
   const pointerRef = useRef(null);
+  const selectRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [actions, setActions] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [regions, setRegions] = useState([]);
   const [brushSize, setBrushSize] = useState(28);
   const [brushMode, setBrushMode] = useState('heal');
+  const [tool, setTool] = useState('brush');
+  const [selection, setSelection] = useState(null);
   const [paperColor, setPaperColor] = useState('#fffdf8');
   const [detecting, setDetecting] = useState(false);
   const [colorBusy, setColorBusy] = useState(false);
@@ -250,6 +345,8 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
     setActions([]);
     setRedoStack([]);
     setRegions([]);
+    setSelection(null);
+    setTool('brush');
     setError('');
     setShowOriginal(false);
     loadImage(src).then((image) => {
@@ -309,6 +406,8 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const { mask } = buildRegionMask(imageData.data, canvas.width, canvas.height, action.rects, paperColor);
         inpaintCanvasMask(ctx, mask, paperColor);
+      } else if (action.type === 'textureRect') {
+        textureFillRect(ctx, action.rect, paperColor);
       }
     }
   }, [actions, paperColor]);
@@ -330,8 +429,13 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   const onPointerDown = (event) => {
     if (!ready || showOriginal || detecting || colorBusy) return;
     const point = pointFromEvent(event);
-    pointerRef.current = { points: [point], color: paperColor, size: brushSize };
     canvasRef.current.setPointerCapture?.(event.pointerId);
+    if (tool === 'select') {
+      selectRef.current = { start: point };
+      setSelection({ x: point.x, y: point.y, width: 0, height: 0 });
+      return;
+    }
+    pointerRef.current = { points: [point], color: paperColor, size: brushSize };
     const ctx = canvasRef.current.getContext('2d');
     ctx.fillStyle = paperColor;
     ctx.beginPath();
@@ -340,8 +444,19 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   };
 
   const onPointerMove = (event) => {
-    if (!pointerRef.current || !ready) return;
+    if (!ready) return;
     const point = pointFromEvent(event);
+    if (tool === 'select' && selectRef.current) {
+      const start = selectRef.current.start;
+      setSelection({
+        x: Math.min(start.x, point.x),
+        y: Math.min(start.y, point.y),
+        width: Math.abs(point.x - start.x),
+        height: Math.abs(point.y - start.y),
+      });
+      return;
+    }
+    if (!pointerRef.current) return;
     const points = pointerRef.current.points;
     const previous = points[points.length - 1];
     points.push(point);
@@ -357,6 +472,13 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
   };
 
   const onPointerUp = () => {
+    if (tool === 'select') {
+      if (selectRef.current) {
+        selectRef.current = null;
+        setSelection((current) => (current && current.width > 8 && current.height > 8 ? current : null));
+      }
+      return;
+    }
     if (!pointerRef.current) return;
     const stroke = pointerRef.current;
     pointerRef.current = null;
@@ -365,6 +487,15 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
       : { type: 'brush', points: stroke.points, color: stroke.color, size: stroke.size };
     setActions((current) => [...current, action]);
     setRedoStack([]);
+  };
+
+  const applySelection = () => {
+    if (!selection || selection.width < 8 || selection.height < 8) return;
+    setActions((current) => [...current, { type: 'textureRect', rect: selection }]);
+    setRedoStack([]);
+    setSelection(null);
+    setTool('brush');
+    toast('已用周围干净纸张纹理修补选区；如果位置不对可以撤销', 'success');
   };
 
   const undo = () => {
@@ -502,9 +633,20 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
         <div className="hw-toolbar">
           <div className="hw-tool-group">
             <span className="hw-tool-label"><Brush size={14} /> 手动擦除</span>
-            <span className="hw-brush-hint">智能修补会从周围纸张取样填补，比整块涂白更自然</span>
+            <span className="hw-brush-hint">{tool === 'select' ? '拖拽框住要清理的笔迹，再点“修补选区”' : '智能修补会从周围纸张取样填补，比整块涂白更自然'}</span>
           </div>
           <div className="hw-tools">
+            <button
+              type="button"
+              className={cx('hw-select-toggle', tool === 'select' && 'is-active')}
+              onClick={() => {
+                setTool(tool === 'select' ? 'brush' : 'select');
+                setSelection(null);
+              }}
+              title="框选一块区域，用周围干净纸张纹理修补"
+            >
+              <Scan size={14} /> 框选修补
+            </button>
             <label className="hw-size-control" title="笔刷大小">
               <span>{brushSize}px</span>
               <input type="range" min="8" max="90" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} />
@@ -566,6 +708,16 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
           </div>
         )}
 
+        {selection && (
+          <div className="hw-region-banner hw-selection-banner">
+            <span><Scan size={15} /> 已框选 {Math.round(selection.width)} × {Math.round(selection.height)} 区域</span>
+            <div className="row">
+              <Button variant="ghost" size="sm" onClick={() => setSelection(null)}>取消框选</Button>
+              <Button variant="primary" size="sm" icon={Eraser} onClick={applySelection}>修补选区</Button>
+            </div>
+          </div>
+        )}
+
         <div className={cx('hw-canvas-wrap', showOriginal && 'is-original')}>
           {!ready && !error && <div className="hw-loading"><Loader2 size={22} className="spin" /> 正在准备图片…</div>}
           <div
@@ -576,7 +728,7 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
           >
             <canvas
               ref={canvasRef}
-              className="hw-canvas"
+              className={cx('hw-canvas', tool === 'select' && 'is-select')}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -587,14 +739,26 @@ export default function HandwritingCleaner({ open, src, title = '去除图片笔
             {!showOriginal && regionOverlays.map((region) => (
               <span className="hw-region-box" style={region.style} key={region.key} title={region.label} />
             ))}
+            {!showOriginal && selection && (
+              <span
+                className="hw-selection-box"
+                style={{
+                  left: `${(selection.x / (natural.width || 1)) * 100}%`,
+                  top: `${(selection.y / (natural.height || 1)) * 100}%`,
+                  width: `${(selection.width / (natural.width || 1)) * 100}%`,
+                  height: `${(selection.height / (natural.height || 1)) * 100}%`,
+                }}
+              />
+            )}
             {showOriginal && <span className="hw-compare-label">原图</span>}
           </div>
         </div>
 
         <div className="hw-tip">
           <span><Brush size={13} /> 手动擦除：按住鼠标/手指涂抹</span>
+          <span><Scan size={13} /> 框选修补：适合成片铅笔字/批注</span>
           <span><PaintBucket size={13} /> 彩色笔迹：本地一键清除</span>
-          <span><Undo2 size={13} /> 每一步都可以撤销，原文件不改变</span>
+          <span><Undo2 size={13} /> 每一步都可以撤销</span>
         </div>
       </div>
     </Modal>

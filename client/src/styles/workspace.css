@@ -102,6 +102,9 @@
 .hw-color-control input { width: 26px; height: 26px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
 .hw-mode-control select { height: 27px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink-soft); font-size: 10.5px; padding: 0 5px; outline: none; }
 .hw-mode-control select:focus { border-color: var(--accent); }
+.hw-select-toggle { display: inline-flex; align-items: center; gap: 4px; height: 27px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 10.5px; font-weight: 650; }
+.hw-select-toggle:hover { border-color: var(--accent); color: var(--accent-hover); background: var(--accent-soft); }
+.hw-select-toggle.is-active { border-color: var(--accent); color: var(--accent-hover); background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
 .hw-ai-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .hw-ai-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 14px; border: 1px solid color-mix(in srgb, var(--violet) 17%, var(--line)); border-radius: 11px; background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--violet-soft) 45%, var(--surface))); flex-wrap: wrap; }
 .hw-ai-bar strong { display: flex; align-items: center; gap: 6px; font-size: 12px; }
@@ -114,7 +117,10 @@
 .hw-canvas-wrap { position: relative; min-height: 210px; display: flex; align-items: center; justify-content: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: repeating-conic-gradient(color-mix(in srgb, var(--surface-2) 65%, transparent) 0% 25%, transparent 0% 50%) 50% / 20px 20px; overflow: auto; }
 .hw-canvas-box { position: relative; width: min(100%, calc(52vh * var(--hw-ratio))); aspect-ratio: var(--hw-ratio); margin: 0 auto; flex: none; }
 .hw-canvas { display: block; width: 100%; height: 100%; border-radius: 3px; box-shadow: 0 8px 28px rgba(20, 30, 25, 0.16); cursor: crosshair; touch-action: none; background: #fffdf8; }
+.hw-canvas.is-select { cursor: cell; }
 .hw-canvas-wrap.is-original .hw-canvas { cursor: default; }
+.hw-selection-box { position: absolute; z-index: 5; border: 1.5px dashed #2b6f5e; background: rgba(43, 111, 94, 0.1); border-radius: 2px; pointer-events: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset; }
+.hw-selection-banner { border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); background: var(--primary-soft); }
 .hw-original-overlay { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: fill; border-radius: 3px; z-index: 2; box-shadow: 0 8px 28px rgba(20, 30, 25, 0.16); }
 .hw-compare-label { position: absolute; left: 8px; top: 8px; z-index: 3; padding: 3px 7px; border-radius: 4px; background: rgba(16, 28, 22, 0.72); color: #fff; font-size: 9px; letter-spacing: 0.1em; }
 .hw-region-box { position: absolute; z-index: 4; border: 1.5px solid #d74d3c; background: rgba(215, 77, 60, 0.12); border-radius: 2px; pointer-events: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset; }
