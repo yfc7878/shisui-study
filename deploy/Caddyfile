@@ -1,0 +1,15 @@
+# 使用 Caddy 反向代理本机 8787，自动申请 HTTPS 证书。
+# 把 study.example.com 换成你的域名；DNS 的 A/AAAA 记录指向服务器。
+# 运行：caddy run --config deploy/Caddyfile
+# 在 .env 中设置 TRUST_PROXY=1
+
+study.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8787
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "same-origin"
+        -Server
+    }
+}

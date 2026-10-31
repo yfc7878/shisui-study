@@ -1,0 +1,2138 @@
+/* =========================================================
+   拾穗 Study · 工具箱
+   番茄钟 / 高级计算器 / 函数图像
+   ========================================================= */
+
+.tools-page {
+  --tool-paper: color-mix(in srgb, var(--surface) 80%, var(--bg));
+}
+
+/* ---------- 标题与工具切换 ---------- */
+
+.tool-header-hints {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tool-header-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  box-shadow: var(--shadow-xs);
+  white-space: nowrap;
+}
+
+.tool-kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-bottom-color: var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.tool-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.tool-tab-segmented {
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.tool-tab-segmented .segmented-item {
+  height: 38px;
+  padding: 0 17px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.tool-tab-segmented .segmented-item.is-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: none;
+}
+
+.tool-tab-segmented .segmented-item.is-active svg {
+  color: var(--primary);
+}
+
+.tool-tab-segmented .segmented-count {
+  background: var(--surface-2);
+  font-size: 9.5px;
+  letter-spacing: 0;
+}
+
+.tool-tab-segmented .segmented-item.is-active .segmented-count {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.tool-tab-note {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.tool-panels {
+  position: relative;
+}
+
+.tool-panel[hidden] {
+  display: none;
+}
+
+.tool-panel {
+  animation: tool-fade 260ms var(--ease);
+}
+
+@keyframes tool-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.tool-footer-note {
+  margin-top: 26px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 共用小件 ---------- */
+
+.tool-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tool-card-title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.tool-card-sub {
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+.tool-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+
+.tool-inline-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.tool-inline-note .btn-link {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.is-spinning svg {
+  animation: spin 1s linear infinite;
+}
+
+/* =========================================================
+   番茄钟
+   ========================================================= */
+
+.tool-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.82fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.tool-timer-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 85% 55% at 50% -8%, color-mix(in srgb, var(--primary-soft) 58%, transparent), transparent 72%),
+    var(--surface);
+}
+
+.tool-timer-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tool-timer-top .tool-mode-segmented {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  border-color: color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.tool-mode-segmented .segmented-item {
+  flex: 1;
+  justify-content: center;
+  gap: 7px;
+}
+
+.tool-settings-toggle {
+  flex: none;
+  border: 1px solid transparent;
+}
+
+.tool-settings-toggle.is-active {
+  background: var(--surface-2);
+  color: var(--primary);
+  border-color: var(--line);
+}
+
+/* ---------- 进度环 ---------- */
+
+.tool-ring {
+  position: relative;
+  width: min(322px, 68vw);
+  aspect-ratio: 1;
+  margin: 20px auto 18px;
+  flex: none;
+}
+
+.tool-ring > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.tool-ring-track {
+  stroke: var(--surface-3);
+}
+
+.tool-ring-value {
+  stroke: var(--primary);
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 480ms var(--ease), stroke 220ms var(--ease);
+}
+
+.tool-ring.is-break .tool-ring-value { stroke: var(--accent); }
+.tool-ring.is-done .tool-ring-value { stroke: var(--gold); }
+
+.tool-ring-halo {
+  stroke: color-mix(in srgb, var(--line) 70%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 1 8;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.tool-ring-inner {
+  position: absolute;
+  inset: 19%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.tool-ring-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.tool-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.tool-ring-status.is-live .tool-status-dot {
+  animation: tool-pulse 2.6s ease-in-out infinite;
+}
+
+.tool-ring.is-break .tool-status-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.tool-ring.is-done .tool-status-dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 14%, transparent);
+}
+
+@keyframes tool-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.78); }
+}
+
+.tool-ring-time {
+  font-family: var(--font-mono);
+  font-size: clamp(38px, 5.6vw, 54px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-ring-prompt {
+  max-width: 17ch;
+  min-height: 3.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.tool-ring-mode {
+  font-family: var(--font-serif);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--faint);
+}
+
+/* ---------- 计时按钮 ---------- */
+
+.tool-timer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.tool-timer-actions .tool-timer-primary {
+  min-width: 168px;
+}
+
+.tool-timer-hint {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--faint);
+  line-height: 1.7;
+}
+
+.tool-timer-hint .tool-kbd {
+  margin: 0 1px;
+}
+
+.tool-done-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--gold-soft) 55%, transparent);
+  color: var(--ink-soft);
+}
+
+.tool-done-note > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--gold);
+}
+
+.tool-done-note div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tool-done-note strong {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.tool-done-note span {
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* ---------- 设置面板 ---------- */
+
+.tool-settings {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: tool-fade 220ms var(--ease);
+}
+
+.tool-settings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tool-settings-head strong {
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+
+.tool-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tool-duration-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.tool-duration-input {
+  padding-right: 27px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.tool-duration-unit {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.tool-settings-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.tool-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.tool-settings-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tool-settings-copy .field-hint {
+  font-size: 10.5px;
+}
+
+.tool-settings-foot {
+  font-size: 10.5px;
+  line-height: 1.65;
+  color: var(--faint);
+}
+
+/* ---------- 统计侧栏 ---------- */
+
+.tool-focus-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.tool-focus-stats-card {
+  padding: 20px;
+}
+
+.tool-focus-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 0 4px;
+}
+
+.tool-focus-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding-right: 8px;
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.tool-focus-stat:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.tool-focus-stat > span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.tool-focus-stat strong {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-focus-stat em {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.tool-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.tool-chart-title {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+
+.tool-chart-note {
+  font-size: 9.5px;
+  color: var(--faint);
+}
+
+.tool-focus-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 112px;
+  padding-top: 18px;
+}
+
+.tool-chart-col {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tool-chart-bar {
+  position: relative;
+  width: 100%;
+  max-width: 20px;
+  min-height: 3px;
+  border-radius: 4px 4px 2px 2px;
+  background: color-mix(in srgb, var(--primary) 56%, var(--surface));
+  transition: height 500ms var(--ease), background var(--dur) var(--ease);
+}
+
+.tool-chart-col.is-today .tool-chart-bar {
+  background: var(--accent);
+}
+
+.tool-chart-col.is-empty .tool-chart-bar {
+  background: var(--surface-3);
+}
+
+.tool-chart-col:hover .tool-chart-bar {
+  filter: saturate(1.15);
+}
+
+.tool-chart-bar i {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-style: normal;
+  color: var(--faint);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+  pointer-events: none;
+}
+
+.tool-chart-col:hover .tool-chart-bar i {
+  opacity: 1;
+}
+
+.tool-chart-label {
+  height: 11px;
+  font-size: 8.5px;
+  line-height: 1;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.tool-chart-empty {
+  flex: 1;
+  align-self: center;
+  text-align: center;
+  font-size: 11px;
+  color: var(--faint);
+  padding-bottom: 20px;
+}
+
+.tool-chart-foot {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--faint);
+}
+
+.tool-focus-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px 18px;
+  background:
+    linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--gold-soft) 42%, var(--surface)));
+}
+
+.tool-guide-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.tool-focus-guide strong {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  margin-bottom: 3px;
+}
+
+.tool-focus-guide p {
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.tool-guide-mark {
+  margin-left: auto;
+  flex: none;
+  color: color-mix(in srgb, var(--gold) 55%, transparent);
+  align-self: flex-end;
+}
+
+/* =========================================================
+   高级计算器
+   ========================================================= */
+
+.tool-calc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(282px, 0.78fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.tool-calc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+/* ---------- 显示区 ---------- */
+
+.tool-calc-display {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 15px 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 70% 100% at 100% 0%, color-mix(in srgb, var(--primary-soft) 32%, transparent), transparent 65%),
+    var(--surface-2);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.tool-calc-display:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--line));
+  box-shadow: var(--shadow-ring);
+}
+
+.tool-calc-display.has-error {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--line));
+}
+
+.tool-calc-display-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.tool-calc-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border-radius: 5px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.tool-calc-ans {
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  border-radius: 4px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-calc-ans:hover {
+  color: var(--primary);
+  background: var(--primary-softer);
+}
+
+.tool-calc-memory-tag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 4px 0 7px;
+  border-radius: 6px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-calc-memory-tag button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tool-calc-memory-tag button:hover {
+  opacity: 1;
+}
+
+.tool-calc-expression {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 3px 0;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: clamp(16px, 2.1vw, 20px);
+  color: var(--ink);
+  caret-color: var(--accent);
+  letter-spacing: -0.01em;
+}
+
+.tool-calc-expression:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.tool-calc-expression::placeholder {
+  color: var(--faint);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  letter-spacing: 0;
+}
+
+.tool-calc-result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 52px;
+  padding: 2px 0 0;
+}
+
+.tool-calc-equals {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--faint);
+}
+
+.tool-calc-result {
+  display: block;
+  max-width: 100%;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: clamp(30px, 4.4vw, 48px);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.tool-calc-result.is-long {
+  font-size: clamp(22px, 3.2vw, 33px);
+  letter-spacing: -0.035em;
+}
+
+.tool-calc-result.is-xlong {
+  font-size: clamp(17px, 2.4vw, 25px);
+  letter-spacing: -0.03em;
+}
+
+.tool-calc-message {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 18px;
+  font-size: 10.5px;
+}
+
+.tool-calc-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.tool-calc-error svg {
+  flex: none;
+}
+
+.tool-calc-hint {
+  color: var(--faint);
+}
+
+/* ---------- 工具条 / 内存 / 函数 ---------- */
+
+.tool-calc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tool-angle-segmented {
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.tool-angle-segmented .segmented-item {
+  height: 27px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+
+.tool-calc-memory-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-key {
+  height: 52px;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  user-select: none;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform 90ms var(--ease);
+}
+
+.tool-key:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-xs);
+}
+
+.tool-key:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.tool-key-op {
+  background: var(--primary-softer);
+  border-color: color-mix(in srgb, var(--primary) 14%, var(--line));
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.tool-key-op:hover:not(:disabled) {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--line));
+}
+
+.tool-key-util {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tool-key-danger {
+  background: var(--danger-soft);
+  border-color: transparent;
+  color: var(--danger);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tool-key-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger-soft) 72%, var(--danger) 10%);
+  border-color: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.tool-key-equals {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 94%, #fff 6%), var(--primary));
+  border-color: color-mix(in srgb, var(--primary) 82%, #000 8%);
+  color: var(--on-primary);
+  font-size: 21px;
+  font-weight: 700;
+  box-shadow: 0 7px 16px -10px color-mix(in srgb, var(--primary) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.tool-key-equals:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary-hover) 96%, #fff 4%), var(--primary-hover));
+  border-color: color-mix(in srgb, var(--primary-hover) 82%, #000 8%);
+}
+
+.tool-key-memory {
+  height: 31px;
+  padding: 0 9px;
+  border-radius: 9px;
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.tool-key-memory:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+  background: var(--primary-softer);
+}
+
+.tool-calc-functions {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
+  padding: 13px 0;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+}
+
+.tool-calc-functions .tool-key-fn {
+  height: 30px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.tool-calc-functions .tool-key-fn:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--line));
+  background: var(--primary-softer);
+}
+
+.tool-calc-keypad {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* ---------- 历史 / 小抄 ---------- */
+
+.tool-calc-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.tool-calc-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  padding: 20px;
+}
+
+.tool-calc-guide {
+  padding: 17px 18px;
+  background:
+    linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--primary-softer) 55%, var(--surface)));
+}
+
+.tool-calc-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+
+.tool-calc-guide-head svg {
+  color: var(--faint);
+}
+
+.tool-calc-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+
+.tool-calc-guide-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.tool-calc-guide-list li > span {
+  width: 58px;
+  flex: none;
+  font-size: 9.5px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.tool-calc-guide-list code {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-soft);
+}
+
+.tool-calc-guide-list em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--faint);
+}
+
+.tool-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 120px;
+  max-height: 430px;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 2px 6px;
+}
+
+.tool-history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: right;
+  transition: background var(--dur) var(--ease);
+}
+
+.tool-history-item:last-child {
+  border-bottom-color: transparent;
+}
+
+.tool-history-item:hover {
+  background: var(--surface-2);
+}
+
+.tool-history-expression {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-history-result {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-history-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 36px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.tool-history-glyph {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--gold) 55%, var(--faint));
+}
+
+.tool-history-empty strong {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.tool-history-empty p {
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--faint);
+  max-width: 24ch;
+}
+
+.tool-calc-tip {
+  margin-top: auto;
+  padding-top: 11px;
+  border-top: 1px dashed var(--line);
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--faint);
+}
+
+.tool-calc-tip .mono {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+/* =========================================================
+   函数图像
+   ========================================================= */
+
+.tool-graph-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 322px;
+  gap: 18px;
+  align-items: start;
+}
+
+.tool-graph-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.tool-graph-head {
+  align-items: center;
+}
+
+.tool-graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tool-graph-toolbar .icon-btn {
+  border: 1px solid transparent;
+}
+
+.tool-graph-toolbar .icon-btn:hover:not(:disabled) {
+  border-color: var(--line);
+}
+
+/* ---------- 画布 ---------- */
+
+.tool-graph-stage {
+  position: relative;
+  width: 100%;
+  height: clamp(380px, 58vh, 620px);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.tool-graph-stage:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--line-strong));
+  box-shadow: var(--shadow-ring);
+}
+
+.tool-graph-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.tool-graph-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.tool-graph-svg text {
+  user-select: none;
+}
+
+.tool-graph-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: 12px;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+.tool-graph-empty svg {
+  opacity: 0.7;
+}
+
+.tool-graph-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--faint);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* ---------- 悬停提示 ---------- */
+
+.tool-graph-tooltip {
+  position: absolute;
+  z-index: 3;
+  width: 202px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+  font-size: 10.5px;
+}
+
+.tool-graph-tooltip-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink);
+}
+
+.tool-graph-tooltip-tag {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-graph-readings {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tool-graph-reading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.tool-graph-reading.is-nearest {
+  color: var(--ink);
+}
+
+.tool-graph-reading-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.tool-graph-reading-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-graph-reading-value {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-graph-reading.is-nearest .tool-graph-reading-value {
+  font-weight: 700;
+}
+
+.tool-graph-tooltip-empty {
+  font-size: 10px;
+  color: var(--faint);
+  padding: 2px 0;
+}
+
+.tool-graph-tooltip-foot {
+  display: block;
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line);
+  font-size: 8.5px;
+  color: var(--faint);
+}
+
+/* ---------- 描点 ---------- */
+
+.tool-graph-point {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 172px;
+  padding: 5px 6px 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-soft);
+}
+
+.tool-graph-point-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.tool-graph-point-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-graph-point button {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+}
+
+.tool-graph-point button:hover {
+  color: var(--ink);
+  background: var(--surface-3);
+}
+
+/* ---------- 底部信息 ---------- */
+
+.tool-graph-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--faint);
+}
+
+.tool-graph-view-text {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
+.tool-graph-axis-note {
+  white-space: nowrap;
+}
+
+/* ---------- 曲线侧栏 ---------- */
+
+.tool-graph-side {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.tool-curve-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-curve-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-curve-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.tool-curve-row:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+}
+
+.tool-curve-row.has-error {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+}
+
+.tool-curve-swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  margin: 0 3px 0 2px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.tool-curve-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 7px;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  border-radius: 6px;
+}
+
+.tool-curve-input:hover:not(:disabled):not(:focus) {
+  border-color: transparent;
+}
+
+.tool-curve-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+  background: var(--surface);
+}
+
+.tool-curve-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  outline-offset: 0;
+}
+
+.tool-curve-row.is-hidden .tool-curve-input {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-color: var(--faint);
+}
+
+.tool-curve-row.is-hidden .tool-curve-swatch {
+  opacity: 0.3;
+}
+
+.tool-curve-row .icon-btn {
+  flex: none;
+  color: var(--faint);
+}
+
+.tool-curve-row .icon-btn:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.tool-curve-error {
+  padding: 1px 4px 1px 20px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+
+.tool-add-curve {
+  margin-top: 1px;
+}
+
+.tool-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.tool-presets-label {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.tool-preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tool-preset {
+  height: 24px;
+  padding: 0 7px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  transition: all var(--dur) var(--ease);
+}
+
+.tool-preset:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-softer);
+}
+
+.tool-preset:disabled {
+  opacity: 0.4;
+}
+
+.tool-graph-range {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.tool-range-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-range-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tool-range-grid .field {
+  gap: 4px;
+}
+
+.tool-range-grid .field-label {
+  font-size: 10px;
+  font-weight: 550;
+  color: var(--muted);
+}
+
+.tool-range-input {
+  height: 32px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  border-radius: 8px;
+}
+
+.tool-range-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-range-actions .btn {
+  height: 31px;
+  font-size: 11px;
+  padding: 0 10px;
+  border-radius: 8px;
+}
+
+.tool-range-error {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+
+.tool-graph-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.tool-graph-tips strong {
+  font-family: var(--font-serif);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.tool-graph-tips p {
+  font-size: 9.8px;
+  line-height: 1.7;
+  color: var(--faint);
+}
+
+.tool-graph-legend-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+/* =========================================================
+   响应式
+   ========================================================= */
+
+@media (max-width: 1180px) {
+  .tool-focus-grid,
+  .tool-calc-grid,
+  .tool-graph-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tool-focus-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .tool-history-list {
+    max-height: 300px;
+  }
+
+  .tool-calc-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
+    align-items: start;
+    gap: 18px;
+  }
+
+  .tool-graph-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+    align-items: start;
+    column-gap: 22px;
+    row-gap: 13px;
+  }
+
+  .tool-graph-side .tool-card-head,
+  .tool-graph-side .tool-curve-list {
+    grid-column: 1 / -1;
+  }
+
+  .tool-graph-side .tool-add-curve,
+  .tool-graph-side .tool-presets {
+    grid-column: 1;
+  }
+
+  .tool-graph-side .tool-graph-range {
+    grid-column: 2;
+    grid-row: 3;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .tool-graph-side .tool-graph-tips {
+    grid-column: 2;
+    grid-row: 4;
+  }
+}
+
+@media (max-width: 960px) {
+  .tool-tab-note {
+    display: none;
+  }
+
+  .tool-tab-segmented {
+    width: 100%;
+  }
+
+  .tool-tab-segmented .segmented-item {
+    flex: 1;
+    justify-content: center;
+    padding: 0 10px;
+  }
+
+  .tool-header-hints {
+    justify-content: flex-start;
+  }
+
+  .tool-timer-card {
+    padding: 18px 16px 16px;
+  }
+
+  .tool-timer-top .tool-mode-segmented {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tool-timer-top .tool-mode-segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tool-mode-segmented .segmented-item {
+    flex: 1;
+    padding: 0 9px;
+    font-size: 11.5px;
+  }
+
+  .tool-ring {
+    width: min(300px, 70vw);
+    margin: 16px auto 16px;
+  }
+
+  .tool-ring-time {
+    font-size: clamp(36px, 8vw, 50px);
+  }
+
+  .tool-calc-card {
+    padding: 16px;
+  }
+
+  .tool-calc-keypad {
+    gap: 7px;
+  }
+
+  .tool-key {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  .tool-calc-memory-row .tool-key-memory {
+    height: 30px;
+    font-size: 10px;
+  }
+
+  .tool-calc-keypad .tool-key-equals {
+    font-size: 19px;
+  }
+
+  .tool-calc-history-card {
+    padding: 17px;
+  }
+
+  .tool-graph-card {
+    padding: 14px;
+  }
+
+  .tool-graph-stage {
+    height: clamp(360px, 54vh, 520px);
+  }
+
+  .tool-graph-side {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tool-graph-side .tool-graph-range {
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+  }
+
+  .tool-graph-side .tool-graph-tips {
+    padding-top: 12px;
+  }
+
+  .tool-header-hint {
+    height: 28px;
+  }
+}
+
+@media (max-width: 700px) {
+  .tool-focus-side {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tool-calc-side {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tool-focus-stats-card {
+    padding: 17px;
+  }
+
+  .tool-focus-stat strong {
+    font-size: 18px;
+  }
+
+  .tool-timer-actions {
+    width: 100%;
+  }
+
+  .tool-timer-actions .btn {
+    flex: 1;
+    min-width: 0;
+    padding: 0 12px;
+  }
+
+  .tool-timer-actions .tool-timer-primary {
+    min-width: 0;
+    flex: 1.5;
+  }
+
+  .tool-ring {
+    width: min(276px, 82vw);
+  }
+
+  .tool-ring-prompt {
+    font-size: 10.5px;
+    max-width: 16ch;
+    min-height: 3.2em;
+  }
+
+  .tool-ring-mode {
+    display: none;
+  }
+
+  .tool-settings-row {
+    align-items: flex-start;
+  }
+
+  .tool-calc-functions {
+    gap: 5px;
+    padding: 11px 0;
+  }
+
+  .tool-calc-functions .tool-key-fn {
+    height: 29px;
+    font-size: 10.5px;
+  }
+
+  .tool-calc-toolbar {
+    gap: 8px;
+  }
+
+  .tool-calc-memory-row {
+    margin-left: auto;
+  }
+
+  .tool-calc-display {
+    padding: 11px 12px 8px;
+  }
+
+  .tool-calc-result-row {
+    min-height: 44px;
+  }
+
+  .tool-calc-result {
+    font-size: clamp(27px, 8vw, 38px);
+  }
+
+  .tool-calc-result.is-long {
+    font-size: clamp(20px, 6vw, 27px);
+  }
+
+  .tool-calc-result.is-xlong {
+    font-size: clamp(15px, 4.6vw, 20px);
+  }
+
+  .tool-calc-expression {
+    font-size: 16px;
+  }
+
+  .tool-calc-keypad {
+    gap: 6px;
+  }
+
+  .tool-key {
+    height: 46px;
+    font-size: 15.5px;
+    border-radius: 10px;
+  }
+
+  .tool-key-equals {
+    font-size: 19px;
+  }
+
+  .tool-key-memory {
+    height: 29px;
+    padding: 0 7px;
+    font-size: 9.5px;
+  }
+
+  .tool-history-list {
+    max-height: 280px;
+  }
+
+  .tool-graph-stage {
+    height: clamp(340px, 55vh, 470px);
+    border-radius: 12px;
+  }
+
+  .tool-graph-hint {
+    left: 8px;
+    bottom: 6px;
+  }
+
+  .tool-graph-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tool-graph-toolbar {
+    justify-content: flex-start;
+  }
+
+  .tool-graph-tooltip {
+    width: 186px;
+  }
+
+  .tool-graph-foot {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .tool-graph-axis-note {
+    display: none;
+  }
+
+  .tool-footer-note {
+    margin-top: 20px;
+  }
+
+  .tool-duration-grid {
+    gap: 8px;
+  }
+
+  .tool-settings-toggles {
+    padding: 11px 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .tool-calc-functions {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .tool-calc-guide-list li > span {
+    width: 52px;
+  }
+}
+
+@media (max-width: 420px) {
+  .tool-header-hints {
+    gap: 6px;
+  }
+
+  .tool-header-hint {
+    font-size: 10px;
+    padding: 0 8px;
+  }
+
+  .tool-tab-segmented .segmented-item {
+    padding: 0 6px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .tool-tab-segmented .segmented-item svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .tool-ring {
+    width: min(252px, 86vw);
+  }
+
+  .tool-ring-inner {
+    inset: 17%;
+  }
+
+  .tool-ring-time {
+    font-size: clamp(33px, 9vw, 42px);
+  }
+
+  .tool-focus-stat em {
+    font-size: 9px;
+  }
+
+  .tool-chart-label {
+    font-size: 8px;
+  }
+
+  .tool-focus-chart {
+    gap: 3px;
+    height: 104px;
+  }
+}

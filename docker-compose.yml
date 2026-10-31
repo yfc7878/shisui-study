@@ -1,0 +1,27 @@
+services:
+  study:
+    build: .
+    container_name: shisui-study
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    volumes:
+      - ./data:/app/data
+
+  # 可选：Cloudflare Tunnel，用一条命令把服务安全地开放到公网。
+  # 先在 Cloudflare Zero Trust 创建 Tunnel，拿到 Token，写入 .env 的 CLOUDFLARE_TUNNEL_TOKEN，
+  # 然后运行：docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: shisui-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - study
